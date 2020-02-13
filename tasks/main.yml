@@ -1,0 +1,79 @@
+---
+# download cpanel backup from url
+- name: Download Cpanel backup
+  debug:
+    msg: "{{ backup_url }}"
+
+- name: Download Cpanel backup
+  get_url:
+    url: "{{ backup_url }}"
+    dest: /tmp
+  register: backup_files
+
+- name: Cpanel backup Downloaded
+  debug:
+    msg: "{{ backup_files[dest] }}"
+
+# Unzip downloaded backup
+- name: UNZIPPING Cpanel backup
+  unarchive:
+    src: "{{ backup_files[dest] }}"
+    dest: "/tmp"
+    list_files: yes
+    copy: no
+  register: unarchived_files
+
+- name: Cpanel backup unarchived
+  debug:
+    msg: "/tmp/{{ unarchived_files.files[0] }}"
+
+- name: Copy home directory files
+  copy:
+    src: "/tmp/{{ unarchived_files.files[0] }}homedir"
+    dest: "/home/{{ domain }}"
+    remote_src: yes
+    directory_mode: yes
+
+# find all files by format sql
+- name: Find backup mysql files
+  find:
+    paths: "/tmp/{{ unarchived_files.files[0] }}mysql"
+    patterns: '*.sql'
+  register: mysql_files
+
+- name: Show mysql file paths
+  debug:
+    msg: "{{ item.path | basename }}"
+  with_items: "{{ mysql_files.files }}"
+
+- name: Restore Cpanel backup databases
+  mysql_db:
+    state: import
+    target: "{{ item.path }}"
+    name: "{{ (item.path | basename) | replace('.sql', '') }}"
+  with_items: "{{ mysql_files.files }}"
+
+- name: Import mysql default users
+  mysql_db:
+    state: import
+    target: "/tmp/{{ unarchived_files.files[0] }}mysql.sql"
+    name: "all"
+
+- name: Add domain to hosts
+  lineinfile:
+    dest: /etc/hosts
+    line: "{{ hostvars[item].ansible_default_ipv4.address }} {{ domain }}"
+    state: present
+  become: yes
+  with_items: "{{ groups.all }}"
+
+- name: Create apache vhost
+  import_role:
+    - role: geerlingguy.apache
+      apache_mods_enabled:
+        - rewrite.load
+        - ssl.load
+      apache_create_vhosts: true
+      apache_vhosts:
+        - servername: "{{ domain }}"
+          documentroot: "/home/{{ domain }}/public_html"
