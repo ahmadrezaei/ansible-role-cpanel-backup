@@ -69,11 +69,12 @@
 
 - name: Create apache vhost
   import_role:
-    - role: geerlingguy.apache
-      apache_mods_enabled:
-        - rewrite.load
-        - ssl.load
-      apache_create_vhosts: true
-      apache_vhosts:
-        - servername: "{{ domain }}"
-          documentroot: "/home/{{ domain }}/public_html"
+    name: geerlingguy.apache
+  vars:
+    apache_mods_enabled:
+      - rewrite.load
+      - ssl.load
+    apache_create_vhosts: true
+    apache_vhosts:
+      - servername: "{{ domain }}"
+        documentroot: "/home/{{ domain }}/public_html"
