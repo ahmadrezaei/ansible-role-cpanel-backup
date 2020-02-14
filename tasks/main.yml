@@ -1,23 +1,30 @@
 ---
+- name: check if Cpanel backup exists
+  stat:
+    path: "/tmp/{{ backup_url | basename }}"
+  register: backup_exists
+
 # download cpanel backup from url
 - name: Download Cpanel backup
   debug:
     msg: "{{ backup_url }}"
+  when: backup_exists.stat.exists == false
 
 - name: Download Cpanel backup
   get_url:
     url: "{{ backup_url }}"
     dest: /tmp
   register: backup_files
+  when: backup_exists.stat.exists == false
 
 - name: Cpanel backup Downloaded
   debug:
-    msg: "{{ backup_files[dest] }}"
+    msg: "/tmp/{{ backup_url | basename }}"
 
 # Unzip downloaded backup
 - name: UNZIPPING Cpanel backup
   unarchive:
-    src: "{{ backup_files[dest] }}"
+    src: "/tmp/{{ backup_url | basename }}"
     dest: "/tmp"
     list_files: yes
     copy: no
